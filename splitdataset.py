@@ -17,9 +17,9 @@ def split_data(root, label, test_size=0.1, validate_size=0.111, random_state=1):
     train, validate = train_test_split(train, test_size=validate_size, random_state=random_state)
     
     # Define destination directories
-    train_dst = root +"/Train/" + label
-    test_dst = root +"/Test/" + label
-    validate_dst = root +"/Validate/" + label
+    train_dst = root +"/Train_Resized/" + label
+    test_dst = root +"/Test_Resized/" + label
+    validate_dst = root +"/Validate_Resized/" + label
     
     # Ensure destination directories exist
     os.makedirs(train_dst, exist_ok=True)
@@ -39,9 +39,9 @@ def split_data(root, label, test_size=0.1, validate_size=0.111, random_state=1):
         shutil.copy(os.path.join(src, image), validate_dst)
 
 # Insert github folder path here
-root = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
+root = 'C:/Users/xcomb/OneDrive/Desktop/ML project/appleuni'
 
-labels = ['Apple', 'Uni Sushi', 'Unknown']
+labels = ['Apple_Resized', 'Uni Sushi_Resized', 'Unknown_Resized']
 
 # Split data for each label
 for label in labels:

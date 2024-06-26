@@ -3,6 +3,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.client import device_lib
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import os
 
@@ -101,7 +102,7 @@ def image_gen_w_aug(train_parent_directory, test_parent_directory, validate_pare
     
     test_generator = test_datagen.flow_from_directory(test_parent_directory,
                                                       target_size=(75,75),
-                                                      batch_size = 25,
+                                                      batch_size = 1,
                                                       class_mode = 'categorical')
     
     return train_generator, val_generator, test_generator
@@ -122,11 +123,11 @@ def model_output_for_TL (pre_trained_model, last_output):
     
     return model
 
-root = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
+root = 'C:/Users/xcomb/OneDrive/Desktop/ML project/appleuni'
 
-train_dir = os.path.join(root+'/Train/')
-val_dir = os.path.join(root+'/Validate/')
-test_dir = os.path.join(root+'/Test/')
+train_dir = os.path.join(root+'/Train_Resized/')
+val_dir = os.path.join(root+'/Validate_Resized/')
+test_dir = os.path.join(root+'/Test_Resized/')
 
 train_generator, validation_generator, test_generator = image_gen_w_aug(train_dir, test_dir, val_dir)
 
@@ -145,10 +146,36 @@ model_TL.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['ac
 
 history_TL = model_TL.fit(
       train_generator,
-      steps_per_epoch=10,  
+      steps_per_epoch=50,  
       epochs=25,
       verbose=1,
       validation_data = validation_generator)
+
+# Evaluate the model on test data
+test_loss, test_acc = model_TL.evaluate(test_generator, verbose=1)
+print(f'Test accuracy: {test_acc}')
+
+
+plt.figure(figsize=(12, 4))
+
+plt.subplot(1, 2, 1)
+plt.plot(history_TL.history['accuracy'], label='Training Accuracy')
+plt.plot(history_TL.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(history_TL.history['loss'], label='Training Loss')
+plt.plot(history_TL.history['val_loss'], label='Validation Loss')
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
 
 tf.keras.models.save_model(model_TL,'my_model.hdf5')
 
