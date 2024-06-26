@@ -120,6 +120,7 @@ history_TL = model_TL.fit(
 # Evaluate the model on test data
 test_loss, test_acc = model_TL.evaluate(test_generator, verbose=1)
 print(f'Test accuracy: {test_acc}')
+print(f'Test loss: {test_loss}')
 
 plt.figure(figsize=(12, 4))
 
