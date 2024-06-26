@@ -13,11 +13,11 @@ import os
 def image_gen_w_aug(train_parent_directory, test_parent_directory, validate_parent_directory):
     
     train_datagen = ImageDataGenerator(rescale=1/255,
-                                      rotation_range = 30,  
-                                      zoom_range = 0.2, 
-                                      width_shift_range=0.2,  
-                                      height_shift_range=0.2,
-                                      shear_range=0.2,
+                                      rotation_range = 40,  
+                                      zoom_range = 0.3, 
+                                      width_shift_range=0.3,  
+                                      height_shift_range=0.3,
+                                      shear_range=0.3,
                                       horizontal_flip=True,
                                       fill_mode='nearest')
     
@@ -32,42 +32,42 @@ def image_gen_w_aug(train_parent_directory, test_parent_directory, validate_pare
     
     val_generator = val_datagen.flow_from_directory(validate_parent_directory,
                                                           target_size = (75,75),
-                                                          batch_size = 15,
+                                                          batch_size = 10,
                                                           class_mode = 'categorical',)
     
     test_generator = test_datagen.flow_from_directory(test_parent_directory,
                                                       target_size=(75,75),
-                                                      batch_size = 15,
+                                                      batch_size = 10,
                                                       class_mode = 'categorical')
     
     return train_generator, val_generator, test_generator
 
 
 def model_output_for_TL (pre_trained_model, last_output):
-
-    # x = Conv2D(32, (3,3), activation='relu', padding='same')(last_output)
-    # x = MaxPooling2D((2,2))(x)
-    # x = BatchNormalization()(x)    
-
-    # x = Conv2D(64, (3,3), activation='relu', padding='same')(last_output)
-    # x = MaxPooling2D((2,2))(x)
-    # x = BatchNormalization()(x)
     
-    x = Flatten()(last_output)
+    x = Conv2D(64, (3,3), activation='relu', padding='same')(last_output)
+    x = MaxPooling2D((2,2))(x)
+    x = BatchNormalization()(x)
     
+    x = Flatten()(x)
     
     # Dense hidden layer with Batch Normalization and L2 regularization
-    x = Dense(512, activation='relu', kernel_regularizer=regularizers.l2(l2))(x)
+    x = Dense(512, activation='relu', kernel_regularizer=regularizers.l1_l2(l1,l2))(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.3)(x)
+    # x = Dropout(0.2)(x)
     
-    x = Dense(256, activation='relu', kernel_regularizer=regularizers.l2(l2))(x)
+    x = Dense(256, activation='relu', kernel_regularizer=regularizers.l1_l2(l1,l2))(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    # x = Dropout(0.1)(x)
     
-    # # Additional Dense layer
-    # x = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(l2))(x)
-    # x = BatchNormalization()(x)
+    # Additional Dense layer
+    x = Dense(128, activation='relu', kernel_regularizer=regularizers.l1_l2(l1,l2))(x)
+    x = BatchNormalization()(x)
+    # x = Dropout(0.1)(x)
+    
+    # Additional Dense layer
+    x = Dense(64, activation='relu', kernel_regularizer=regularizers.l1_l2(l1,l2))(x)
+    x = BatchNormalization()(x)
     # x = Dropout(0.1)(x)
     
     # Output neuron. 
@@ -78,12 +78,13 @@ def model_output_for_TL (pre_trained_model, last_output):
     return model
 
 # Hyperparameters
-lr = 0.0001
-epochs = 40
-steps_per_epoch = 50
+lr = 0.001
+epochs = 50
+steps_per_epoch = 30
+l1 = 0.000005
 l2 = 0.00001
 
-root = 'C:/Users/xcomb/OneDrive/Desktop/ML project/appleuni'
+root = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
 
 train_dir = os.path.join(root+'/Train_Resized/')
 val_dir = os.path.join(root+'/Validate_Resized/')
@@ -114,13 +115,32 @@ history_TL = model_TL.fit(
       epochs=epochs,
       verbose=1,
       validation_data = validation_generator,
-      callbacks=[]
+      callbacks=[reduce_lr]
       )
 
 # Evaluate the model on test data
 test_loss, test_acc = model_TL.evaluate(test_generator, verbose=1)
 print(f'Test accuracy: {test_acc}')
 print(f'Test loss: {test_loss}')
+
+# Retrieve final values
+training_accuracy = history_TL.history['accuracy'][-1]
+validation_accuracy = history_TL.history['val_accuracy'][-1]
+training_loss = history_TL.history['loss'][-1]
+validation_loss = history_TL.history['val_loss'][-1]
+
+# Print summary
+print(f"\nModel Summary:")
+print(f"Training Accuracy: {training_accuracy:.4f}")
+print(f"Validation Accuracy: {validation_accuracy:.4f}")
+print(f"Test Accuracy: {test_acc:.4f}\n")
+print(f"Training Loss: {training_loss:.4f}")
+print(f"Validation Loss: {validation_loss:.4f}")
+print(f"Test Loss: {test_loss:.4f}\n")
+print(f"Learning Rate: {lr}")
+print(f"Epochs: {epochs}")
+print(f"Steps Per Epoch: {steps_per_epoch}")
+print(f"Batch Size: {train_generator.batch_size}")
 
 plt.figure(figsize=(12, 4))
 
