@@ -28,7 +28,7 @@ regularizer = 4
 data_aug = True
 
 # Directories
-root = 'C:/Users/kahny/ML Model'
+root = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
 train_dir = os.path.join(root, 'Train_Resized/')
 val_dir = os.path.join(root, 'Validate_Resized/')
 test_dir = os.path.join(root, 'Test_Resized/')
