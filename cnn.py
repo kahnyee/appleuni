@@ -28,7 +28,7 @@ regularizer = 4
 data_aug = True
 
 # Directories
-root = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
+root = 'C:/Users/kahny/ML Model'
 train_dir = os.path.join(root, 'Train_Resized/')
 val_dir = os.path.join(root, 'Validate_Resized/')
 test_dir = os.path.join(root, 'Test_Resized/')
@@ -116,9 +116,10 @@ class CustomStopper(Callback):
     def on_epoch_end(self, epoch, logs=None):
         train_acc = logs.get('accuracy')
         val_acc = logs.get('val_accuracy')
-        if train_acc >= 0.95 and val_acc >= 0.95:
-            print(f"\nStopping training as both train and val accuracy have reached 95%.")
-            self.model.stop_training = True
+        if train_acc is not None and val_acc is not None:
+            if train_acc >= 0.97 and val_acc >= 0.97:
+                print(f"\nStopping training as both train and val accuracy have reached 97%.")
+                self.model.stop_training = True
 
 def plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title):
     # Find the indices of misclassified images
