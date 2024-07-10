@@ -16,7 +16,7 @@ def import_and_predict(image_data, model):
 
 
 # Loading a trained model
-model_path = "C:/Users/kahny/ML Model/95bestmodel.h5"
+model_path = "C:/Users/kahny/ML Model/97bestmodel.h5"
 model = tf.keras.models.load_model(model_path)
 
 # Streamlit app
@@ -32,7 +32,7 @@ else:
     st.image(image, use_column_width=True)
     prediction = import_and_predict(image, model)
 
-    label_map = {0: "It is an apple!", 1: "It is a uni!", 2: "It is unknown!"}
+    label_map = {0: "It is an apple!", 1: "It is a uni sushi!", 2: "It is unknown!"}
     predicted_label = np.argmax(prediction)
     st.write(label_map[predicted_label])
 

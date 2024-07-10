@@ -1,8 +1,8 @@
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Input, concatenate
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Input, concatenate, GlobalAveragePooling2D, Layer, Activation
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback, LearningRateScheduler
 from tensorflow.keras import regularizers
 import matplotlib.pyplot as plt
 import os
@@ -22,7 +22,7 @@ con_filters = "(64,128,256,512)"
 
 dense_layer = 3
 drop_out_rate = "(0.1,0.1,0.1)"
-dense_filters="(64,32,16)"
+dense_filters = "(64,32,16)"
 
 regularizer = 4
 data_aug = True
@@ -83,20 +83,67 @@ def inception_module(x, filters):
     out = concatenate([conv1, conv3, conv5, pool], axis=-1)
     return out
 
+def residual_block(x, filters, kernel_size=3):
+    shortcut = Conv2D(filters, (1, 1), padding='same')(x)  # Adjust the number of filters in the shortcut
+    x = Conv2D(filters, kernel_size, padding='same', activation='relu')(x)
+    x = BatchNormalization()(x)
+    x = Conv2D(filters, kernel_size, padding='same', activation=None)(x)
+    x = BatchNormalization()(x)
+    x = tf.keras.layers.add([shortcut, x])
+    x = Activation('relu')(x)
+    return x
+
+class AttentionModule(Layer):
+    def __init__(self, **kwargs):
+        super(AttentionModule, self).__init__(**kwargs)
+        self.dense1 = Dense(units=None, activation='relu')  # units will be set dynamically
+        self.dense2 = Dense(units=None, activation='sigmoid')  # units will be set dynamically
+
+    def build(self, input_shape):
+        self.dense1.units = input_shape[-1] // 8
+        self.dense2.units = input_shape[-1]
+        super(AttentionModule, self).build(input_shape)
+
+    def call(self, x):
+        avg_pool = tf.reduce_mean(x, axis=[1, 2], keepdims=True)
+        max_pool = tf.reduce_max(x, axis=[1, 2], keepdims=True)
+        concat = concatenate([avg_pool, max_pool], axis=-1)
+        dense1_output = self.dense1(concat)
+        dense2_output = self.dense2(dense1_output)
+        return x * dense2_output
+
+def mixup_data(x, y, alpha=0.2):
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+    batch_size = x.shape[0]
+    index = np.random.permutation(batch_size)
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    mixed_y = lam * y + (1 - lam) * y[index, :]
+    return mixed_x, mixed_y
+
+def cosine_annealing(epoch):
+    return initial_learning_rate * (1 + np.cos(np.pi * epoch / epochs)) / 2
+
 def build_model(input_shape):
     input_layer = Input(shape=input_shape)
     
     x = Conv2D(32, (3, 3), padding='same', activation='relu')(input_layer)
+    x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
     
     x = inception_module(x, [32, (48, 64), (8, 16), 16])
     x = MaxPooling2D((2, 2))(x)
+    x = residual_block(x, 64)
     
     x = inception_module(x, [64, (96, 128), (16, 32), 32])
     x = MaxPooling2D((2, 2))(x)
+    x = AttentionModule()(x)
     
     x = inception_module(x, [128, (128, 192), (32, 96), 64])
     x = MaxPooling2D((2, 2))(x)
+    x = residual_block(x, 128)
     
     x = inception_module(x, [128, (128, 192), (32, 96), 64])
     x = MaxPooling2D((2, 2))(x)
@@ -121,41 +168,6 @@ class CustomStopper(Callback):
                 print(f"\nStopping training as both train and val accuracy have reached 97%.")
                 self.model.stop_training = True
 
-def plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title):
-    # Find the indices of misclassified images
-    misclassified_indices = np.where(predicted_classes != true_labels)[0]
-    
-    # Number of misclassified images
-    num_misclassified = len(misclassified_indices)
-    print(f"Number of misclassified images in {title}: {num_misclassified}")
-    
-    if num_misclassified > 0:
-        max_images_per_plot = 9
-        num_plots = int(np.ceil(num_misclassified / max_images_per_plot))
-        
-        for plot_num in range(num_plots):
-            start_idx = plot_num * max_images_per_plot
-            end_idx = start_idx + max_images_per_plot
-            plot_indices = misclassified_indices[start_idx:end_idx]
-            
-            num_images_in_plot = len(plot_indices)
-            rows = int(np.ceil(num_images_in_plot / 3))
-            cols = 3  # Fixed number of columns
-            
-            plt.figure(figsize=(15, 15))
-            for i, idx in enumerate(plot_indices):
-                plt.subplot(rows, cols, i + 1)
-                img_path = os.path.join(img_dir, generator.filenames[idx])
-                img = plt.imread(img_path)
-                plt.imshow(img)
-                plt.title(f"True: {class_labels[true_labels[idx]]}\nPred: {class_labels[predicted_classes[idx]]}")
-                plt.axis('off')
-            plt.suptitle(f"{title} - Plot {plot_num + 1}")
-            plt.tight_layout()
-            plt.show()
-    else:
-        print(f"No misclassified images to display in {title}.")
-
 train_generator, validation_generator, test_generator = image_gen_w_aug(train_dir, val_dir, test_dir)
 
 input_shape = (75, 75, 3)
@@ -166,6 +178,7 @@ model.compile(optimizer=Adam(learning_rate=initial_learning_rate), loss='categor
 early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5)
 custom_stopper = CustomStopper()
+lr_scheduler = LearningRateScheduler(cosine_annealing)
 
 # Function to convert DirectoryIterator to tf.data.Dataset
 def generator_to_dataset(generator):
@@ -189,7 +202,7 @@ history = model.fit(
       epochs=epochs,
       validation_data=validation_dataset,
       validation_steps=len(validation_generator),
-      callbacks=[reduce_lr, custom_stopper]
+      callbacks=[reduce_lr, custom_stopper, lr_scheduler]
 )
 
 # Evaluate the model on test data
@@ -236,16 +249,3 @@ plt.tight_layout()
 plt.show()
 
 model.save('my_model.h5')
-
-# Plot misclassified images for training, validation, and test sets
-def evaluate_and_plot_misclassified(generator, img_dir, title):
-    generator.reset()
-    true_labels = generator.classes
-    class_labels = list(generator.class_indices.keys())
-    predictions = model.predict(generator, steps=len(generator), verbose=1)
-    predicted_classes = np.argmax(predictions, axis=1)
-    plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title)
-
-evaluate_and_plot_misclassified(train_generator, train_dir, "Training Set")
-evaluate_and_plot_misclassified(validation_generator, val_dir, "Validation Set")
-evaluate_and_plot_misclassified(test_generator, test_dir, "Test Set")
