@@ -14,7 +14,7 @@ def read_and_decode(filename, reshape_dims):
 def show_image(filename, reshape_dims):
     img = read_and_decode(filename, reshape_dims)
     plt.imshow(img.numpy().astype("uint8"))
-    plt.title(filename)
+    plt.title(os.path.basename(filename))
     plt.xlabel('Width')
     plt.ylabel('Height')
 
