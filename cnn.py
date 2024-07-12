@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Input, concatenate
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
@@ -105,9 +105,10 @@ class CustomStopper(Callback):
         train_acc = logs.get('accuracy')
         val_acc = logs.get('val_accuracy')
         if train_acc is not None and val_acc is not None:
-            if train_acc >= 0.97 and val_acc >= 0.97:
+            if train_acc >= 0.96 and val_acc >= 0.96:
+                print("Stopping training as both training and validation accuracy have reached 96%.")
                 self.model.stop_training = True
-                
+
 def plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title):
     # Find the indices of misclassified images
     misclassified_indices = np.where(predicted_classes != true_labels)[0]
@@ -171,12 +172,12 @@ model.summary()
 # Training the model
 with tf.device("/GPU:0"):
     history = model.fit(
-      train_dataset,
-      steps_per_epoch=len(train_generator),
-      epochs=epochs,
-      validation_data=validation_dataset,
-      validation_steps=len(validation_generator),
-      callbacks=[reduce_lr, custom_stopper]
+        train_dataset,
+        steps_per_epoch=len(train_generator),
+        epochs=epochs,
+        validation_data=validation_dataset,
+        validation_steps=len(validation_generator),
+        callbacks=[reduce_lr, custom_stopper]  # Ensure custom_stopper is included here
     )
 
 # Evaluate the model on test data
