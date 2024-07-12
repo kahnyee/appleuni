@@ -71,7 +71,11 @@ def image_gen_w_aug(train_parent_directory, validate_parent_directory, test_pare
 # Create data generators
 train_generator, validation_generator, test_generator = image_gen_w_aug(train_dir, val_dir, test_dir)
 
+<<<<<<< HEAD
 # Function to build the model
+=======
+# Function to build the model which attempts to simulate the InceptionV3 layers without using Transfer Learning.
+>>>>>>> 8df5909f585a44524a1d699c3507a2f5b196c9f1
 def build_sequential_inception(input_shape):
     model = Sequential()
 
@@ -127,7 +131,11 @@ class CustomStopper(Callback):
         val_acc = logs.get('val_accuracy')
         if train_acc is not None and val_acc is not None:
             if train_acc >= 0.97 and val_acc >= 0.97:
+<<<<<<< HEAD
                 print("Both training and validation accuracy have reached 97%.")
+=======
+                print("Stopping training as both training and validation accuracy have reached 97%.")
+>>>>>>> 8df5909f585a44524a1d699c3507a2f5b196c9f1
                 self.model.stop_training = True
 
 # Compile the model
@@ -206,6 +214,7 @@ plt.ylabel('Loss')
 plt.legend()
 
 plt.tight_layout()
+<<<<<<< HEAD
 plt.show()
 
 # Function to plot misclassified images
@@ -254,3 +263,6 @@ def evaluate_and_plot_misclassified(generator, img_dir, title):
 evaluate_and_plot_misclassified(train_generator, train_dir, "Training Set")
 evaluate_and_plot_misclassified(validation_generator, val_dir, "Validation Set")
 evaluate_and_plot_misclassified(test_generator, test_dir, "Test Set")
+=======
+plt.show()
+>>>>>>> 8df5909f585a44524a1d699c3507a2f5b196c9f1
