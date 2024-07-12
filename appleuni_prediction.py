@@ -1,23 +1,51 @@
 import numpy as np
 import streamlit as st
 import tensorflow as tf
+import keras
 from PIL import Image, ImageOps
+from IPython.display import display
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cv2
+import os
 
-def get_img_array(img):
-    size = (75, 75)
-    image = ImageOps.fit(img, size, Image.LANCZOS)
-    image = image.convert('RGB')
-    image = np.asarray(image)
-    image = (image.astype(np.float32) / 255.0)
-    img_array = np.expand_dims(image, axis=0)
-    return img_array
+img_size = (75, 75)
+
+last_conv_layer_name = "conv2d_174"
+classifier_layer_names = [
+    "avg_pool",
+    "predictions",
+]
+
+
+def get_img_array(img_path, size):
+
+    img = keras.utils.load_img(img_path, target_size=size)
+    img = img.convert('RGB')
+
+    array = keras.utils.img_to_array(img)
+    array = (array.astype(np.float32) / 255.0)
+
+    array = np.expand_dims(array, axis=0)
+    return array
+
+def get_img_array(img, size):
+    
+    img = img.convert('RGB')
+
+    array = keras.utils.img_to_array(img)
+    array = (array.astype(np.float32) / 255.0)
+
+    array = np.expand_dims(array, axis=0)
+    return array
+
 
 def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
-    grad_model = tf.keras.models.Model(
-        [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+
+    grad_model = keras.models.Model(
+        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
     )
+
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(img_array)
         if pred_index is None:
@@ -25,55 +53,83 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
         class_channel = preds[:, pred_index]
 
     grads = tape.gradient(class_channel, last_conv_layer_output)
+
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
     last_conv_layer_output = last_conv_layer_output[0]
     heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
     heatmap = tf.squeeze(heatmap)
+
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
-    heatmap = heatmap.numpy()
-    return heatmap
+    return heatmap.numpy()
 
-def import_and_predict(image_data, model):
-    img_array = get_img_array(image_data)
-    prediction = model.predict(img_array)
-    heatmap = make_gradcam_heatmap(img_array, model, 'conv2d_4')  # Use the name of your last convolutional layer
-    return prediction, heatmap
+def save_and_display_gradcam(image, heatmap, caption, cam_path="cam.jpg", alpha=2, display_size=(704, 704)):
+    # Load the original image
+    img = image
+    img = keras.utils.img_to_array(img)
 
-def save_and_display_gradcam(img, heatmap, cam_path="cam.jpg", alpha=0.4):
-    img = ImageOps.fit(img, (75, 75), Image.LANCZOS)
-    img = img.convert('RGB')
-    img = np.array(img)
-    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+    # Rescale heatmap to a range 0-255
     heatmap = np.uint8(255 * heatmap)
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    superimposed_img = cv2.addWeighted(heatmap, alpha, img, 1 - alpha, 0)
-    cv2.imwrite(cam_path, superimposed_img)
-    return cam_path
 
-# Loading a trained model
-model_path = "C:/Users/kahny/ML Model/97bestmodel.h5"
-model = tf.keras.models.load_model(model_path)
+    # Use jet colormap to colorize heatmap
+    jet = mpl.colormaps["jet"]
 
-# Streamlit app
+    # Use RGB values of the colormap
+    jet_colors = jet(np.arange(256))[:, :3]
+    jet_heatmap = jet_colors[heatmap]
+
+    # Create an image with RGB colorized heatmap
+    jet_heatmap = keras.utils.array_to_img(jet_heatmap)
+    jet_heatmap = jet_heatmap.resize((img.shape[1], img.shape[0]))
+    jet_heatmap = keras.utils.img_to_array(jet_heatmap)
+
+    # Superimpose the heatmap on original image
+    superimposed_img = jet_heatmap * alpha + img
+    superimposed_img = keras.utils.array_to_img(superimposed_img)
+
+    # Save the superimposed image
+    superimposed_img.save(cam_path)
+    st.image(superimposed_img, width=display_size[0], caption=caption)
+
+
 st.write("# Apple, Uni, Unknown Classification")
 st.write("This is a simple image classification web app to predict apple, uni, or unknown objects")
-
 file = st.file_uploader("Please upload an image file", type=["jpg", "png"])
 
 if file is None:
     st.text("You haven't uploaded an image file")
 else:
     image = Image.open(file)
+    if image.mode in ("RGBA", "P"):
+        image = image.convert("RGB")
     st.image(image, use_column_width=True)
-    prediction, heatmap = import_and_predict(image, model)
+    image = ImageOps.fit(image, (75,75), Image.LANCZOS)
+    
+    model_path = "C:/Users/Jayden/Desktop/ml_project_github/appleuni/97bestmodel.h5"
+    model = tf.keras.models.load_model(model_path)
 
+    # Prepare image
+    img_array = get_img_array(image, size=img_size)
+    
+    prediction = model.predict(img_array)
     label_map = {0: "It is an apple!", 1: "It is a uni sushi!", 2: "It is unknown!"}
     predicted_label = np.argmax(prediction)
     st.write(label_map[predicted_label])
 
     st.text("Probability (0: Apple, 1: Uni, 2: Unknown)")
     st.write(prediction)
+    
+    # # Remove last layer's softmax
+    # model.layers[-1].activation = None
+
+    # Generate class activation heatmap
+    heatmap_apple = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=0)
+    heatmap_uni = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=1)
+    heatmap_unknown = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=2)
 
     # Display heatmap
-    cam_path = save_and_display_gradcam(image, heatmap)
-    st.image(cam_path, caption='Grad-CAM Heatmap', use_column_width=True)
+    save_and_display_gradcam(image, heatmap_apple, "Apple Heatmap")
+    save_and_display_gradcam(image, heatmap_uni, "Uni Sushi Heatmap")
+    save_and_display_gradcam(image, heatmap_unknown,"Unknown Heatmap")
+    
+
