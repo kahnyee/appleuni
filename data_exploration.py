@@ -2,9 +2,8 @@ import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-# Constants
-IMG_HEIGHT = 300  # You can set this to your desired height
-IMG_WIDTH = 300   # You can set this to your desired width
+IMG_HEIGHT = 300  
+IMG_WIDTH = 300   
 
 def read_and_decode(filename, reshape_dims):
     img = tf.io.read_file(filename)
