@@ -38,7 +38,6 @@ def split_data(root, label, test_size=0.1, validate_size=0.111, random_state=1):
     for image in validate:
         shutil.copy(os.path.join(src, image), validate_dst)
 
-# Insert github folder path here
 root = 'C:/Users/kahny/ML Model'
 
 labels = ['Apple_Resized', 'Uni Sushi_Resized', 'Unknown_Resized']
@@ -46,4 +45,3 @@ labels = ['Apple_Resized', 'Uni Sushi_Resized', 'Unknown_Resized']
 # Split data for each label
 for label in labels:
     split_data(root, label)
-
