@@ -1,89 +1,95 @@
 import numpy as np
 import streamlit as st
 import tensorflow as tf
-from keras import utils as keras_utils
 from PIL import Image, ImageOps
-import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
-# Image size for the model
-img_size = (75, 75)
+# Constants
+IMG_SIZE = (75, 75)
+MODEL_PATH = "C:/Users/kahny/ML Model/97bestmodelspyder.h5"
+ALPHA = 0.6  # Transparency for heatmap
 
-# Names of the last convolutional layer and classifier layers
-last_conv_layer_name = "conv2d_174"
-
-def get_img_array(img, size):
-    """Convert image to a preprocessed array."""
-    img = img.convert('RGB')
-    array = keras_utils.img_to_array(img)
-    array = array.astype(np.float32) / 255.0
+# Function to load and preprocess the image
+def preprocess_image(image, size):
+    image = image.resize(size, Image.LANCZOS).convert('RGB')
+    array = np.array(image) / 255.0  # Convert PIL Image to numpy array and normalize
     return np.expand_dims(array, axis=0)
 
-def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
-    """Generate Grad-CAM heatmap."""
-    grad_model = tf.keras.models.Model(
-        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
-    )
-    with tf.GradientTape() as tape:
-        last_conv_layer_output, preds = grad_model(img_array)
-        if pred_index is None:
-            pred_index = tf.argmax(preds[0])
-        class_channel = preds[:, pred_index]
+# Function to find last convolutional layer
+def find_last_conv_layer(model):
+    for layer in reversed(model.layers):
+        if isinstance(layer, tf.keras.layers.Conv2D):
+            return layer
+    raise ValueError("No convolutional layer found in the model.")
 
-    grads = tape.gradient(class_channel, last_conv_layer_output)
+# Function to generate Grad-CAM heatmap
+def get_grad_cam(model, img_array, class_idx):
+    last_conv_layer = model.get_layer('conv2d_130')  # Adjusted to your last conv layer
+    conv_output = last_conv_layer.output
+
+    grad_model = tf.keras.models.Model([model.inputs], [conv_output, model.output])
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model(img_array)
+        loss = predictions[:, class_idx]
+
+    grads = tape.gradient(loss, conv_outputs)[0]
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
 
-    heatmap = last_conv_layer_output[0] @ pooled_grads[..., tf.newaxis]
-    heatmap = tf.squeeze(heatmap)
-    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    heatmap = tf.reduce_mean(tf.multiply(pooled_grads, conv_outputs), axis=-1)
+    heatmap = np.maximum(heatmap, 0)
+    heatmap /= tf.reduce_max(heatmap) + 1e-8  # Normalize to [0, 1]
     return heatmap.numpy()
 
-def save_and_display_gradcam(image, heatmap, caption, cam_path="cam.jpg", alpha=0.4):
-    """Save and display the Grad-CAM heatmap."""
-    img = keras_utils.img_to_array(image)
+# Function to save and display Grad-CAM heatmap
+def save_and_display_gradcam(image, heatmap, caption, alpha=0.6, display_size=(704, 704)):
     heatmap = np.uint8(255 * heatmap)
+    heatmap_colored = cm.jet(heatmap)[:, :, :3]  # Apply a colormap and remove the alpha channel
+    heatmap_colored = np.uint8(heatmap_colored * 255)  # Convert to uint8
+    heatmap_colored = Image.fromarray(heatmap_colored).resize((image.shape[1], image.shape[0]))
+    heatmap_colored = np.array(heatmap_colored)
+    superimposed_img = heatmap_colored * alpha + image
+    superimposed_img = Image.fromarray(np.uint8(superimposed_img))
+    st.image(superimposed_img, caption=caption, width=display_size[0])
 
-    jet = mpl.colormaps["jet"]
-    jet_colors = jet(np.arange(256))[:, :3]
-    jet_heatmap = jet_colors[heatmap]
+# Load model
+@st.cache(allow_output_mutation=True)
+def load_model():
+    return tf.keras.models.load_model(MODEL_PATH)
 
-    jet_heatmap = keras_utils.array_to_img(jet_heatmap)
-    jet_heatmap = jet_heatmap.resize((img.shape[1], img.shape[0]))
-    jet_heatmap = keras_utils.img_to_array(jet_heatmap)
+model = load_model()
 
-    superimposed_img = jet_heatmap * alpha + img
-    superimposed_img = keras_utils.array_to_img(superimposed_img)
-    superimposed_img.save(cam_path)
-    st.image(superimposed_img, use_column_width=True, caption=caption)
-
-# Streamlit web app
+# Streamlit app
 st.write("# Apple, Uni, Unknown Classification")
 st.write("This is a simple image classification web app to predict apple, uni, or unknown objects")
+
 file = st.file_uploader("Please upload an image file", type=["jpg", "png"])
 
-if file:
+if file is None:
+    st.text("You haven't uploaded an image file")
+else:
     image = Image.open(file)
     if image.mode in ("RGBA", "P"):
         image = image.convert("RGB")
     st.image(image, use_column_width=True)
-    image = ImageOps.fit(image, img_size, Image.LANCZOS)
-    
-    model_path = "C:/Users/kahny/ML Model/97bestmodelspyder.h5"
-    model = tf.keras.models.load_model(model_path)
+    image_resized = image.resize(IMG_SIZE, Image.LANCZOS)
+    img_array = preprocess_image(image_resized, IMG_SIZE)
 
-    img_array = get_img_array(image, size=img_size)
-    prediction = model.predict(img_array)
-    
-    label_map = {0: "It is an apple!", 1: "It is a uni sushi!", 2: "It is unknown!"}
-    predicted_label = np.argmax(prediction)
-    st.write(label_map[predicted_label])
-    st.write("Probability (0: Apple, 1: Uni, 2: Unknown)", prediction)
-    
-    heatmap_apple = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=0)
-    heatmap_uni = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=1)
-    heatmap_unknown = make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=2)
+    # Make prediction
+    try:
+        prediction = model.predict(img_array)
+        class_names = {0: "Apple", 1: "Uni Sushi", 2: "Unknown"}
+        predicted_class = np.argmax(prediction)
+        st.write(f"Prediction: {class_names[predicted_class]}")
+        st.text("Probability")
+        st.write(prediction)
 
-    save_and_display_gradcam(image, heatmap_apple, "Apple Heatmap")
-    save_and_display_gradcam(image, heatmap_uni, "Uni Sushi Heatmap")
-    save_and_display_gradcam(image, heatmap_unknown, "Unknown Heatmap")
-else:
-    st.text("You haven't uploaded an image file")
+        # Generate Grad-CAM heatmap
+        heatmap = get_grad_cam(model, img_array, predicted_class)
+
+        # Display Grad-CAM heatmap
+        save_and_display_gradcam(np.array(image), heatmap, f"{class_names[predicted_class]} Grad-CAM")
+
+    except Exception as e:
+        st.text(f"Error: {e}")

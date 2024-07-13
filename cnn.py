@@ -28,7 +28,7 @@ def image_gen_w_aug(train_parent_directory, validate_parent_directory, test_pare
     # Data augmentation for the training data
     train_datagen = ImageDataGenerator(
         rescale=1/255,
-        rotation_range=45,
+        rotation_range=35,
         zoom_range=0.3,
         width_shift_range=0.3,
         height_shift_range=0.3,
@@ -71,7 +71,7 @@ def image_gen_w_aug(train_parent_directory, validate_parent_directory, test_pare
 # Create data generators
 train_generator, validation_generator, test_generator = image_gen_w_aug(train_dir, val_dir, test_dir)
 
-# Function to build the model
+# Function to build the model which attempts to simulate the InceptionV3 layers without using Transfer Learning.
 def build_sequential_inception(input_shape):
     model = Sequential()
 
@@ -127,14 +127,14 @@ class CustomStopper(Callback):
         val_acc = logs.get('val_accuracy')
         if train_acc is not None and val_acc is not None:
             if train_acc >= 0.97 and val_acc >= 0.97:
-                print("Both training and validation accuracy have reached 97%.")
+                print("Stopping training as both training and validation accuracy have reached 97%.")
                 self.model.stop_training = True
 
 # Compile the model
 model.compile(optimizer=Adam(learning_rate=initial_learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
 
 # Callbacks
-early_stop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5)
 custom_stopper = CustomStopper()
 
@@ -207,50 +207,3 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
-
-# Function to plot misclassified images
-def plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title):
-    misclassified_indices = np.where(predicted_classes != true_labels)[0]
-    num_misclassified = len(misclassified_indices)
-    print(f"Number of misclassified images in {title}: {num_misclassified}")
-
-    if num_misclassified > 0:
-        max_images_per_plot = 9
-        num_plots = int(np.ceil(num_misclassified / max_images_per_plot))
-
-        for plot_num in range(num_plots):
-            start_idx = plot_num * max_images_per_plot
-            end_idx = start_idx + max_images_per_plot
-            plot_indices = misclassified_indices[start_idx:end_idx]
-
-            num_images_in_plot = len(plot_indices)
-            rows = int(np.ceil(num_images_in_plot / 3))
-            cols = 3  # Fixed number of columns
-
-            plt.figure(figsize=(15, 15))
-            for i, idx in enumerate(plot_indices):
-                plt.subplot(rows, cols, i + 1)
-                img_path = os.path.join(img_dir, generator.filenames[idx])
-                img = plt.imread(img_path)
-                plt.imshow(img)
-                plt.title(f"True: {class_labels[true_labels[idx]]}\nPred: {class_labels[predicted_classes[idx]]}")
-                plt.axis('off')
-            plt.suptitle(f"{title} - Plot {plot_num + 1}")
-            plt.tight_layout()
-            plt.show()
-    else:
-        print(f"No misclassified images to display in {title}.")
-
-# Function to evaluate and plot misclassified images
-def evaluate_and_plot_misclassified(generator, img_dir, title):
-    generator.reset()
-    true_labels = generator.classes
-    class_labels = list(generator.class_indices.keys())
-    predictions = model.predict(generator, steps=len(generator), verbose=1)
-    predicted_classes = np.argmax(predictions, axis=1)
-    plot_misclassified_images(generator, true_labels, predicted_classes, class_labels, img_dir, title)
-
-# Plot misclassified images for training, validation, and test sets
-evaluate_and_plot_misclassified(train_generator, train_dir, "Training Set")
-evaluate_and_plot_misclassified(validation_generator, val_dir, "Validation Set")
-evaluate_and_plot_misclassified(test_generator, test_dir, "Test Set")
