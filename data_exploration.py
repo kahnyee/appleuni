@@ -34,7 +34,7 @@ def plot_images_from_folders(base_folder, folders, reshape_dims):
                     show_image(file_path, reshape_dims)
                     plt.show()
 
-base_folder = 'C:/Users/Jayden/Desktop/ml_project_github/appleuni'
+base_folder = 'C:/Users/kahny/ML Model'
 folders = ['Apple_Resized', 'Uni Sushi_Resized', 'Unknown_Resized']
 
 # Plot images from the specified folders
