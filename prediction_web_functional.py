@@ -8,7 +8,7 @@ import os
 
 # Constants
 IMG_SIZE = (75, 75)
-LAST_CONV_LAYER_NAME = "conv2d_174"
+LAST_CONV_LAYER_NAME = "conv2d_24"
 CLASSIFIER_LAYER_NAMES = ["avg_pool", "predictions"]
 MODEL_PATH = "C:/Users/kahny/ML Model/model_functional.h5"
 LABEL_MAP = {0: "It is an apple!", 1: "It is a uni sushi!", 2: "It is unknown!"}
