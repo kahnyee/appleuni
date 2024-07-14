@@ -9,7 +9,7 @@ label = ''  # Placeholder for the label of the predicted class
 frame = None  # Placeholder for the video frame
 
 def import_and_predict(image_data, model):
-    """Processes an image and makes a prediction using the given model."""
+    # Processes an image and makes a prediction using the given model
     size = (75, 75)
     image = ImageOps.fit(image_data, size, Image.LANCZOS)
     image = image.convert('RGB')

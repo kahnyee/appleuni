@@ -5,10 +5,11 @@ import numpy as np
 import os
 import sys
 
-label = ''
-frame = None
+label = ''  # Placeholder for the label of the predicted class
+frame = None  # Placeholder for the video frame
 
 def import_and_predict(image_data, model):
+    # Processes an image and makes a prediction using the given model
     size = (75, 75)
     image = ImageOps.fit(image_data, size, Image.LANCZOS)
     image = image.convert('RGB')
@@ -19,7 +20,7 @@ def import_and_predict(image_data, model):
     return prediction
 
 # Load the pre-trained model
-model_path = 'C:/Users/kahny/ML Model/97bestmodel.h5'
+model_path = 'C:/Users/kahny/ML Model/model_sequential.h5'
 model = tf.keras.models.load_model(model_path)
 
 cap = cv2.VideoCapture(0)
@@ -30,7 +31,7 @@ else:
     cap.open()
 
 while True:
-    ret, original = cap.read()
+    ret, original = cap.read() # Read a frame from the camera
     if not ret:
         break
 
@@ -61,4 +62,3 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 sys.exit()
-
